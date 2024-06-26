@@ -83,6 +83,7 @@ int main(void)
   char *cmd[MAX_ARGS];
   // to tell shell whether to terminate
   //int status;
+  char cwd[1024];
   int child_status;
   pid_t pid;
 
@@ -97,10 +98,37 @@ for (;;) {
     continue; //skip to the next iteration of loop
   } 
   
+  //----------added stuff to execute builtin cmds---------------------
+
+  // Check for built-in commands
+  int status = 3;
+  for (int i = 0; i< numOfBuiltinFunctions(); i++) {
+    if (strcmp(cmd[0], builtin_commands[i]) == 0) {
+      (*builtin_command_func[i])(cmd);
+      continue;
+    }
+  }
+
+
+  //----------added stuff to execute builtin cmds---------------------
+
   // If the command is "exit", break out of the loop to terminate the shell
   if (strcmp(cmd[0], "exit") == 0)
     // break;
     return 0;
+
+// Formulate the full path of the command to be executed
+  char full_path[PATH_MAX];
+  char cwd[1024];
+  if (getcwd(cwd, sizeof(cwd)) != NULL)
+  {
+    snprintf(full_path, sizeof(full_path), "%s/bin/%s", cwd, cmd[0]);
+  }
+  else
+  {
+    printf("Failed to get current working directory.");
+    exit(1);
+  }
 
   //fork a new process
   pid = fork();
@@ -112,36 +140,16 @@ for (;;) {
   }
   else if(pid==0) {
     //child successful
-    // Formulate the full path of the command to be executed
-    char full_path[PATH_MAX];
-    char cwd[1024];
-    if (getcwd(cwd, sizeof(cwd)) != NULL)
-    {
-      snprintf(full_path, sizeof(full_path), "%s/bin/%s", cwd, cmd[0]);
-    }
-    else
-    {
-      printf("Failed to get current working directory.");
-      exit(1);
-    }
-
     execv(full_path, cmd);
-     
-    
-    //----------added stuff to execute builtin cmds---------------------
-
-    // Check for built-in commands
-    for (int i = 0; i< numOfBuiltinFunctions(); i++) {
-      if (strcmp(cmd[0], builtin_commands[i]) == 0) {
-        (*builtin_command_func[i])(cmd);
-        continue;
-      }
-    }
-    //----------added stuff to execute builtin cmds---------------------
-    
-    // If execv returns, command execution has failed
+    //since execv returned, function likely was not found, check root
+    snprintf(full_path, sizeof(full_path), "%s/bin/%s", getenv("PWD"), cmd[0]);
+    execv(full_path, cmd);
+    execvp(cmd[0], cmd);
+    //if execvp returns, command execution has failed    
     printf("Command %s not found\n", cmd[0]);
     exit(0);
+  
+
 
   
     // Free the allocated memory for the command arguments before exiting
@@ -152,7 +160,7 @@ for (;;) {
     memset(cwd, '\0', sizeof(cwd)); // clear the cwd array
 
     return 0;    
-  }
+}
 
   else {
     //parent process
@@ -277,37 +285,11 @@ int list_env(char **args) {
     return 1;
 }
 
-// Sets or modifies an environment variable for this shell session
-int set_env_var(char **args) {
-  int overwrite = 1;  
-  //ensure the correct number of args is provided
-  if (args[1] == NULL) {
-    fprintf(stderr, "CSEShell: expected an arg for the \"setenv\" command: KEY=VALUE\n");
-    return 1;
-  }
+int set_env_var(char **args)
+{
+  return putenv(args[1]);
+}
 
-  //find the "=" character in the argument
-  char *delimiter = strchr(args[1], '=');
-  if (delimiter == NULL){
-    fprintf(stderr, "CSEShell: Invalid format for the \"setenv\" command. Expected format: KEY=VALUE\n");
-    return 1;
-  }
-
-  //Split the arg into key and value 
-  *delimiter = '\0'; // Replace '=' with null terminator to split the string
-  char *key = args[1];
-  char *value = delimiter + 1;
-
-  if (setenv(key, value, overwrite) != 0) { 
-    //setenv return 0 on success and -1 on failure
-    perror("setenv");
-    return 1;
-  }
-    // Print confirmation, getenv retrieve modified value of env var
-    printf("Environment variable '%s' set to '%s'\n ", args[1], getenv(args[1]));
-
-    return 0;
-}  
 
 int unset_env_var(char **args){
   if ( unsetenv(args[1]) != 0 ) {
@@ -319,4 +301,5 @@ int unset_env_var(char **args){
 
   return 0;  
 }
+
 
