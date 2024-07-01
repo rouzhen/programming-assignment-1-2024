@@ -4,7 +4,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
-
+#include <semaphore.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #define MAX_LINE 1024
 #define MAX_ARGS 64
@@ -18,7 +20,9 @@ const char *builtin_commands[] = {
     "usage",    // Provides a brief usage guide for the shell and its built-in command
     "env",      // Lists all the environment variables currently set in the shell
     "setenv",   // Sets or modifies an environment variable for this shell session
-    "unsetenv"    };   // Removes an environment variable from the shell*/
+    "unsetenv",       // Removes an environment variable from the shell*/
+    "settheme"
+};
 
 int numOfBuiltinFunctions() {
   return sizeof(builtin_commands) / sizeof(char *);
@@ -32,6 +36,7 @@ int shell_usage(char **args);
 int list_env(char **args);
 int set_env_var(char **args);
 int unset_env_var(char **args);
+int shell_set_theme(char **args);
 
 /* array of function pointers, takes in char ** arg and return int */
 int (*builtin_command_func[])(char **) = {
@@ -41,5 +46,6 @@ int (*builtin_command_func[])(char **) = {
     &shell_usage,  // builtin_command_func[3]: usage
     &list_env,     // builtin_command_func[4]: env
     &set_env_var,  // builtin_command_func[5]: setenv
-    &unset_env_var // builtin_command_func[6]: unsetenv 
+    &unset_env_var, // builtin_command_func[6]: unsetenv 
+    &shell_set_theme
 }; 
